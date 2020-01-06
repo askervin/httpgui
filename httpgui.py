@@ -805,7 +805,7 @@ class Page(object):
                 'name': name,
                 'eid': eid,
                 'attr': attr})
-        to_queue.append('}}))')
+        to_queue.append('}}), eval_response)')
         self._token2python[token] = cb
         self._session._add_to_browser_queue(''.join(to_queue))
 
@@ -832,10 +832,16 @@ class Page(object):
             if "." in name:
                 # replace an attribute
                 eid, attr = name.split(".", 1)
-                to_queue.append("document.getElementById(%(eid)r).setAttribute(%(attr)r, %(new_value)r);" % {
-                    'eid': eid,
-                    'attr': attr,
-                    'new_value': name_content_dict[name]})
+                if not "-" in attr and not " " in attr:
+                    to_queue.append("document.getElementById(%(eid)r).%(attr)s=%(new_value)r;" % {
+                        'eid': eid,
+                        'attr': attr,
+                        'new_value': name_content_dict[name]})
+                else:
+                    to_queue.append("document.getElementById(%(eid)r).setAttribute(%(attr)r, %(new_value)r);" % {
+                        'eid': eid,
+                        'attr': attr,
+                        'new_value': name_content_dict[name]})
             else:
                 # replace contents of element
                 content = self._tokenize_html(name_content_dict[name])
