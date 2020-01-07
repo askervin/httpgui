@@ -12,6 +12,7 @@ html_chat_room = """
 .e{font: bold 14px sans-serif; fill: blue;}
 </style>
 <table>
+<tr><td>Server:</td><td id="time"></td></tr>
 <tr><td>Room:</td><td id="room">%(room)s <input id="destroy" type="button" value="Destroy" python-onclick="onclick_destroy(ctx)"/></td></tr>
 <tr><td>Users:</td><td id="users"></td></tr>
 </table>
@@ -164,12 +165,14 @@ def update_users(room):
     users = []
     for user in sorted(room_user[room]):
         if room_user[room][user].typing:
-            users.append("<i>" + user + "</i>")
+            users.append("<b>" + user + "</b>")
         else:
             users.append(user)
-    html_users = ", ".join(users) + time.strftime(" (%H:%M:%S)")
+    html_users = ", ".join(users)
     for user in room_user[room]:
-        room_user[room][user].session.page().update({'users': html_users})
+        room_user[room][user].session.page().update(
+            {'users': html_users,
+             'time': time.strftime(" %H:%M:%S")})
 
 if __name__ == "__main__":
     try:
