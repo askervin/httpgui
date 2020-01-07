@@ -105,9 +105,11 @@ function timer_tick() {
         send_to_server("timer_tick(ctx, " + tick_count + ")", "{}", eval_time_response);
 }
 
-function properties_to_dict(obj) {
+function properties_to_dict(obj, attr_list=undefined) {
     var dict = {};
     for (var property in obj) {
+        if (attr_list != undefined && !attr_list.includes(property))
+            continue;
         if (typeof obj[property] == "number" ||
             typeof obj[property] == "boolean" ||
             typeof obj[property] == "string") {
@@ -117,22 +119,26 @@ function properties_to_dict(obj) {
     return dict;
 }
 
-function send_event(event_string, event, elt) {
-    var event_dict = properties_to_dict(event);
-    var target_dict = properties_to_dict(event.target);
-    event_dict["target"] = target_dict;
-    var elt_dict = properties_to_dict(elt);
-    event_dict["elt"] = elt_dict;
-    var elt_bbox = {};
-    try {
-        elt_bbox = properties_to_dict(elt.getBBox());
-    } catch (err) {
-        try {
-            elt_bbox = properties_to_dict(elt.getBoundingClientRect());
-        } catch (err) {
-        }
+function send_event(event_string, event, elt, event_attr_list) {
+    var event_dict = properties_to_dict(event, event_attr_list);
+    if (event_attr_list == undefined || event_attr_list.includes("target")) {
+        var target_dict = properties_to_dict(event.target);
+        event_dict["target"] = target_dict;
     }
-    event_dict["elt"]["bbox"] = elt_bbox;
+    if (event_attr_list == undefined || event_attr_list.includes("elt")) {
+        var elt_dict = properties_to_dict(elt);
+        event_dict["elt"] = elt_dict;
+        var elt_bbox = {};
+        try {
+            elt_bbox = properties_to_dict(elt.getBBox());
+        } catch (err) {
+            try {
+                elt_bbox = properties_to_dict(elt.getBoundingClientRect());
+            } catch (err) {
+            }
+        }
+        event_dict["elt"]["bbox"] = elt_bbox;
+    }
     last_sent_event = event;
     var call_env = {"event": event_dict};
     send_to_server(event_string, JSON.stringify(call_env), eval_response);
@@ -164,7 +170,7 @@ _html_basepage='''
 default_favicon = base64.b64decode('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')
 
 _re_timer_tick = re.compile(rb'timer_tick\(ctx, [0-9]+\)')
-_re_python_attr = re.compile(r' python-(?P<js_event>on[a-zA-Z0-9]*)="(?P<python>[^"]*)"')
+_re_python_attr = re.compile(r' python-(?P<js_event>on[a-zA-Z0-9]*)(\((?P<event_attrs>[a-zA-Z0-9, ]*)\))?="(?P<python>[^"]*)"')
 _re_python_event = re.compile(r'python-(?P<js_event>on[a-zA-Z0-9]*)')
 
 def log(msg): # override this function to catch httpgui log somewhere else
@@ -731,13 +737,17 @@ class Page(object):
             tokenized_html.append(whats_left[:python_event_match.start()])
             python_code = python_event_match.groupdict()['python']
             js_event = python_event_match.groupdict()['js_event']
+            if not python_event_match.groupdict()['event_attrs'] is None:
+                event_attrs = str([a.strip() for a in python_event_match.groupdict()['event_attrs'].split(",")])
+            else:
+                event_attrs = "undefined"
             if python_code in self._python2token:
                 token = self._python2token[python_code]
             else:
                 token = b"T(%d)" % (len(self._python2token),)
                 self._token2python[token] = python_code
                 self._python2token[python_code] = token
-            tokenized_html.append(''' %s="send_event('%s', event, this)"''' % (js_event, token.decode("utf-8")))
+            tokenized_html.append(''' %s="send_event('%s', event, this, %s)"''' % (js_event, token.decode("utf-8"), event_attrs))
             whats_left = whats_left[python_event_match.end():]
             python_event_match = _re_python_attr.search(whats_left)
         tokenized_html.append(whats_left)
@@ -752,10 +762,20 @@ class Page(object):
     def update_env(self, env_dict):
         """add variables (keys) and values (values) in dict to run env"""
         self._env.update(env_dict)
-        for key in env_dict:
+        for key in sorted(env_dict.keys()):
             if key.startswith("python-on"):
                 # this is not variable name to eval environment,
                 # this is a global callback. set it as window listener
+                if "(" in key and ")" in key: # there is event attr list
+                    key_nofilter, _after_open_paren = key.split("(", 1)
+                    env_dict[key_nofilter] = env_dict[key]
+                    del env_dict[key]
+                    key = key_nofilter
+                    _in_paren = _after_open_paren.split(")", 1)[0]
+                    event_attrs = [a.strip() for a in _in_paren.split(",")]
+                    event_attr_list = str(event_attrs)
+                else:
+                    event_attr_list = "undefined"
                 try:
                     js_event = _re_python_event.match(key).groupdict()['js_event'][2:] # skip "on" prefix
                 except Exception as e:
@@ -764,7 +784,7 @@ class Page(object):
                 self._tokenize_html('<dontcare %s="%s" />' % (key, python_code))
                 token = self._python2token[python_code]
                 self._session._add_to_browser_queue(
-                    "window.addEventListener(%r, function (event) { send_event(%r, event, undefined); })" % (js_event, token.decode("utf-8")))
+                    "window.addEventListener(%r, function (event) { send_event(%r, event, undefined, %s); })" % (js_event, token.decode("utf-8"), event_attr_list))
 
     def session(self):
         return self._session
