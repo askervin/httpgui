@@ -2,6 +2,7 @@ import html
 import sys
 import _thread
 import time
+import urllib.parse
 
 import httpgui
 httpgui.log = lambda msg: sys.stderr.write(msg + "\n")
@@ -26,8 +27,8 @@ html_chat_room = """
 """
 
 html_bad_url = """Bad URL. Better luck next time."""
-
 html_room_destroyed = """Room destroyed."""
+html_someone_replaced_you = """You were replaced by a user with the same name. (Want to try another name?)"""
 
 class Room_user:
     session = None
@@ -183,7 +184,9 @@ if __name__ == "__main__":
     while 1:
         session = httpgui.new_session(host_port, env=globals())
         try:
-            _, room, user = session.path().split("/")
+            _, url_room, url_user = session.path().split("/")
+            room = urllib.parse.unquote(url_room)
+            user = urllib.parse.unquote(url_user)
             if room == "" or user == "":
                 raise
         except:
@@ -193,12 +196,19 @@ if __name__ == "__main__":
         session.user = user
         if not room in room_user:
             room_user[room] = {}
+        if user in room_user[room]:
+            room_user[room][user].session.new_page(html_someone_replaced_you, static=True)
+            join_message = "entered room and replaced a user with the same name"
+        else:
+            join_message = "entered room"
         room_user[room][user] = Room_user() # todo: delete old?
         room_user[room][user].session = session
-        room_user[room][user].messages = ['entered room ' + room] + ['' * (max_messages - 1)]
+        room_user[room][user].messages = ['entering ' + room + '...'] + ['' * (max_messages - 1)]
         session.new_page(html_chat_room %
                          {'room': room,
                           'user': user,
                           'messages': messages_to_html(room, user, "scroll 1 up")},
                          {'python-onkeydown(key)': "onkeydown(ctx)"})
+
         update_users(room)
+        send_message(session, join_message)
