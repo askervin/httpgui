@@ -837,6 +837,7 @@ class Page(object):
                   dictionary of keys and values of either or both:
                   1. element_id: inner_html
                   2. element_id.attribute_name: new_attribute_value
+                  3. "js": javascript_to_be_executed
 
         Examples: replace OLD with NEW...
           1. in <ELEMENT id="EID">OLD</ELEMENT>
