@@ -1,3 +1,12 @@
+"""chat.py - chat room server
+
+Usage: python3 chat.py BINDHOST:PORT
+
+Example: python3 chat.py 0.0.0.0:5555
+
+Go to ROOM as USER by entering URL http://hostname/ROOM/USER
+"""
+
 import html
 import sys
 import _thread
