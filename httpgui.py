@@ -849,8 +849,16 @@ class Page(object):
                             % (type(name_content_dict),))
         to_queue = []
         for name in name_content_dict:
-            if "." in name:
+            if name == "js":
+                # run raw javascript
+                to_queue.append(name_content_dict[name])
+            elif name.startswith("window."):
+                # direct access to some javascript objects
+                # example: {"window.location.href": "http://new/url"}
+                to_queue.append("%(eid)s=%(new_value)r;" % (name, name_content_dict[name]))
+            elif "." in name:
                 # replace an attribute
+                # example: {"myEltID.myEltAttr": "new value"}
                 eid, attr = name.split(".", 1)
                 if not "-" in attr and not " " in attr:
                     to_queue.append("document.getElementById(%(eid)r).%(attr)s=%(new_value)r;" % {
@@ -864,6 +872,7 @@ class Page(object):
                         'new_value': name_content_dict[name]})
             else:
                 # replace contents of element
+                # example: {"myDivID": "new html"}
                 content = self._tokenize_html(name_content_dict[name])
                 to_queue.append("document.getElementById(%(name)r).innerHTML=%(content)r;" % {
                     'name': name,
