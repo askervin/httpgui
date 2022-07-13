@@ -186,17 +186,20 @@ def _close(conn):
     except:
         pass
 
-def _http_send_ok(conn, s):
+def _http_send_ok(conn, s, headers={}):
     if isinstance(s, bytes):
         s_bytes = s
     else:
         s_bytes = bytes(s, "utf-8")
+    content_type = headers.get('Content-Type', b"text/html; charset=utf-8")
+    if isinstance(content_type, str):
+        content_type = bytes(content_type, "utf-8")
     resp = (b"HTTP/1.1 200 OK\r\n"
             b"Server: Hot Penguin\r\n"
             b"Keep-Alive: timeout=30\r\n"
             b"Connection: Keep-Alive\r\n"
-            b"Content-Type: text/html; charset=utf-8\r\n"
-            b"Content-Length: %d\r\n\r\n%s") % (len(s_bytes), s_bytes)
+            b"Content-Type: %b\r\n"
+            b"Content-Length: %d\r\n\r\n%s") % (content_type, len(s_bytes), s_bytes)
     return conn.sendall(resp)
 
 def _http_send_404(conn, s):
@@ -270,6 +273,17 @@ class Protocol(object):
     """
 
     def __init__(self, *a, **kw):
+        """
+        Examples:
+            # Certain resources are not session-specific.
+            # What is returned to those requests can be specified as
+            # common_resources.
+            p = Protocol(common_resources={
+                   "myimage.jpg": {"Content-Type": "image/jpeg",
+                                   "data": open("myimage.jpg", "rb").read()}
+                })
+            s = p.new_session("localhost:8080")
+        """
         self.name = "Protocol"
         self._sockets = {}
         self._sid2conn = {} # {session-id: socket_connection}
@@ -277,6 +291,8 @@ class Protocol(object):
         self._allow_new_session_lock = _thread.allocate_lock()
         self._allow_new_session = {} # (host, port) -> [lock1, lock2, ...]
         self._favicon = default_favicon
+        self._common_resources = kw.get('common_resources', {})
+
 
     def new_session(self, hostspec, **kw):
         """
@@ -383,12 +399,21 @@ class Protocol(object):
             data = _http_read(conn)
             if data == b"": # connection lost
                 break
-            elif b"favicon.ico" in data[:data.find(b'\r\n\r\n')]:
+            data_first_line = data.split(b"\n", 1)[0]
+            if b"favicon.ico" in data_first_line:
                 if not "favicon" in options:
                     _http_send_ok(conn, self._favicon)
                 else:
                     _http_send_ok(conn, options['favicon'])
                 continue
+            if data_first_line.startswith(b"GET"):
+                fields = data_first_line.split(b" ")
+                if len(fields) == 3:
+                    resource = fields[1].decode("utf-8")
+                    handler = self._common_resources.get(resource, None)
+                    if isinstance(handler, dict):
+                        _http_send_ok(conn, handler["data"], handler)
+                        continue
             session, object_id = self._check_session(data)
             if not session: # this starts a new session
                 session_lock = self._new_session_allowed(host_port)
