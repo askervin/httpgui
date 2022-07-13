@@ -784,7 +784,15 @@ class Page(object):
                 self._tokenize_html('<dontcare %s="%s" />' % (key, python_code))
                 token = self._python2token[python_code]
                 self._session._add_to_browser_queue(
-                    "window.addEventListener(%r, function (event) { send_event(%r, event, undefined, %s); })" % (js_event, token.decode("utf-8"), event_attr_list))
+                    "if (typeof(httpgui_events) == \"undefined\") httpgui_events=Object();"
+                    "if (typeof(httpgui_events.%(js_event)s) == \"undefined\")"
+                    "    httpgui_events.%(js_event)s = function (event) {"
+                    "        send_event(%(token)r, event, undefined, %(event_attr_list)s); };"
+                    "window.removeEventListener(%(js_event)r, httpgui_events.%(js_event)s);"
+                    "window.addEventListener(%(js_event)r, httpgui_events.%(js_event)s);" %
+                    {"js_event": js_event,
+                     "token": token.decode("utf-8"),
+                     "event_attr_list": event_attr_list})
 
     def session(self):
         return self._session
